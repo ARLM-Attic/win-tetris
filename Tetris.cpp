@@ -1,8 +1,8 @@
 /******************************************************************************************/
 /*                                                                                        */
-/*  WinTris - Tetris For Windows							  */
+/*  WinTris - Tetris For Windows														  */
 /*  Original: August 17, 2002                                                             */
-/*  Modified: May 18, 2008								  */
+/*  Modified: May 18, 2008																  */
 /*  Dave Behnke                                                                           */
 /*                                                                                        */
 /******************************************************************************************/
@@ -40,9 +40,9 @@ COLORREF color_value[COLOR_COUNT] = { RGB( 255, 0, 0 ), RGB( 255, 128, 0 ), RGB(
 HBRUSH brush_index[COLOR_COUNT] = { 0 };
 
 int text_offset_x = 0, text_offset_y = 0;
-int level = 19, rows_per_level = 0, full_rows = 0, total_rows = 0, score = 0;
-unsigned long speed[20] = { 300, 295, 290, 285, 280, 275, 250, 225, 200, 175, 
-							170, 165, 160, 150, 145, 140, 135, 130, 125, 100 };
+int level = 0, rows_per_level = 0, full_rows = 0, total_rows = 0, score = 0;
+unsigned long speed[20] = { 290, 285, 280, 275, 270, 265, 240, 215, 190, 165, 
+							160, 155, 150, 145, 140, 135, 125, 120, 115, 90 };
 
 const int PIECE_COUNT = 7;
 
