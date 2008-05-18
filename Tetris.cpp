@@ -1,7 +1,8 @@
 /******************************************************************************************/
 /*                                                                                        */
-/*  Tetris                                                                                */
-/*  August 17, 2002                                                                       */
+/*  WinTris - Tetris For Windows							  */
+/*  Original: August 17, 2002                                                             */
+/*  Modified: May 18, 2008								  */
 /*  Dave Behnke                                                                           */
 /*                                                                                        */
 /******************************************************************************************/
@@ -10,8 +11,7 @@
 #define WIN32_LEAN_AND_MEAN
 
 #include <windows.h>
-#include <time.h>
-#include <limits.h>
+#include <tchar.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <mmsystem.h>
@@ -26,6 +26,9 @@ HDC hdcBuffer = NULL, hdcBackground = NULL;
 DWORD current_time = 0, last_time = 0;
 BOOL fDropped = FALSE, fStart = FALSE, fActive = FALSE;
 
+PTCHAR szBuffer;
+const int STRING_BUFFER_SIZE = 256;
+
 const int COLOR_COUNT = 9;
 
 enum color_type { RED = 0, ORANGE, YELLOW, GREEN, BLUE, WHITE, MAGENTA, BLACK, GRAY };
@@ -37,7 +40,7 @@ COLORREF color_value[COLOR_COUNT] = { RGB( 255, 0, 0 ), RGB( 255, 128, 0 ), RGB(
 HBRUSH brush_index[COLOR_COUNT] = { 0 };
 
 int text_offset_x = 0, text_offset_y = 0;
-int level = 0, rows_per_level = 0, full_rows = 0, total_rows = 0, score = 0;
+int level = 19, rows_per_level = 0, full_rows = 0, total_rows = 0, score = 0;
 unsigned long speed[20] = { 300, 295, 290, 285, 280, 275, 250, 225, 200, 175, 
 							170, 165, 160, 150, 145, 140, 135, 130, 125, 100 };
 
@@ -51,9 +54,11 @@ const int FIELD_HEIGHT = 28;
 const int BRICK_WIDTH = 16;
 const int BRICK_HEIGHT = 16;
 
+const int SCORE_MAX_NAME = 8;
+
 struct score_t
 {
-	char name[8];
+	TCHAR name[SCORE_MAX_NAME];
 	int score;
 };
 
@@ -280,7 +285,7 @@ void make_field(int x, int y)
 		}
 	}
 
-	for (row = 2; row < 7; row++)
+	for (int row = 2; row < 7; row++)
 	{
 		for (int col = 12; col < 17; col++)
 		{
@@ -310,7 +315,7 @@ void draw_field(HDC hdc)
 		}
 	}
 
-	for (row = 2; row < 7; row++)
+	for (int row = 2; row < 7; row++)
 	{
 		for (int col = 12; col < 17; col++)
 		{
@@ -321,20 +326,21 @@ void draw_field(HDC hdc)
 
 void render_frame(HWND hWnd)
 {
-	char Buffer[6];
-	
 	BitBlt(hdcBuffer, 0, 0, BRICK_WIDTH * (FIELD_WIDTH + INFO_WIDTH - 1), BRICK_HEIGHT * (FIELD_HEIGHT - 1), hdcBackground, 0, 0, SRCCOPY);
 	
 	draw_field(hdcBuffer);
 	
-	sprintf(Buffer, "%0.6d", level + 1);
-	TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 9 + text_offset_y, Buffer, 6);
+	ZeroMemory(szBuffer, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+	_stprintf_s(szBuffer, STRING_BUFFER_SIZE, TEXT("%0.6d"), level + 1);
+	TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 9 + text_offset_y, szBuffer, static_cast<int>(_tcslen(szBuffer)));
 
-	sprintf(Buffer, "%0.6d", total_rows);
-	TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 13 + text_offset_y, Buffer, 6);
+	ZeroMemory(szBuffer, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+	_stprintf_s(szBuffer, STRING_BUFFER_SIZE, TEXT("%0.6d"), total_rows);
+	TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 13 + text_offset_y, szBuffer, static_cast<int>(_tcslen(szBuffer)));
 
-	sprintf(Buffer, "%0.6d", score);
-	TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 17 + text_offset_y, Buffer, 6);
+	ZeroMemory(szBuffer, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+	_stprintf_s(szBuffer, STRING_BUFFER_SIZE, TEXT("%0.6d"), score);
+	TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 17 + text_offset_y, szBuffer, static_cast<int>(_tcslen(szBuffer)));
 
 	HDC hdc = GetDC(hWnd);
 	BitBlt(hdc, 0, 0, BRICK_WIDTH * (FIELD_WIDTH + INFO_WIDTH - 1), BRICK_HEIGHT * (FIELD_HEIGHT - 1), hdcBuffer, 0, 0, SRCCOPY);	
@@ -350,7 +356,7 @@ void process_input(void)
 	{
 		if (GetAsyncKeyState(LastKeyPressed) & 0x8000)
 		{
-			if ((timeGetTime() - StartTime) >= 200)
+			if ((timeGetTime() - StartTime) >= 175)
 			{
 				LastKeyPressed = 0;
 			}
@@ -423,7 +429,7 @@ void process_input(void)
 
 unsigned long hash_time(void)
 {
-	unsigned long hash = 0, now = time(NULL);
+	unsigned long hash = 0, now = GetTickCount();
 	char *p = (char *)&now;
 	
 	for (int i = 0; i < sizeof(unsigned long); i++)
@@ -437,19 +443,18 @@ void read_hof(void)
 	HKEY hKey;
 	DWORD dwDisp;
 
-	RegCreateKeyEx(HKEY_CURRENT_USER, "Tetris", 0, "", 0, KEY_READ | KEY_WRITE, NULL, &hKey, &dwDisp);
+	RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Tetris"), 0, TEXT(""), 0, KEY_READ | KEY_WRITE, NULL, &hKey, &dwDisp);
 
 	if (dwDisp == REG_CREATED_NEW_KEY)
 	{
 		ZeroMemory(&hall_of_fame, sizeof(struct score_t) * 3);
-		
-		int i;
-		
-		for (i = 0; i < 3; i++)
-			lstrcpy(hall_of_fame[i].name, ".......");
-		
-		for (i = 0; i < 3; i++)
+			
+		TCHAR szText[] = TEXT(".......");
+		for (int i = 0; i < 3; i++)
+		{
+			_tcscpy_s(hall_of_fame[i].name, SCORE_MAX_NAME, szText);				
 			hall_of_fame[i].score = 0;
+		}
 	
 		RegSetValueEx(hKey, NULL, 0, REG_BINARY, (PBYTE)&hall_of_fame, sizeof(struct score_t) * 3);
 	}
@@ -467,20 +472,18 @@ void write_hof(void)
 	HKEY hKey;
 	DWORD dwDisp;
 
-	RegCreateKeyEx(HKEY_CURRENT_USER, "Tetris", 0, "", 0, KEY_READ | KEY_WRITE, NULL, &hKey, &dwDisp);
+	RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Tetris"), 0, TEXT(""), 0, KEY_READ | KEY_WRITE, NULL, &hKey, &dwDisp);
 
 	if (dwDisp == REG_CREATED_NEW_KEY)
 	{
 		ZeroMemory(&hall_of_fame, sizeof(struct score_t) * 3);
-		
-		int i;
-		
-		for (i = 0; i < 3; i++)
-			lstrcpy(hall_of_fame[i].name, ".......");
-		
-		for (i = 0; i < 3; i++)
+			
+		TCHAR szText[] = TEXT(".......");
+		for (int i = 0; i < 3; i++)
+		{
+			_tcscpy_s(hall_of_fame[i].name, SCORE_MAX_NAME, szText);				
 			hall_of_fame[i].score = 0;
-		
+		}
 	}
 
 	RegSetValueEx(hKey, NULL, 0, REG_BINARY, (PBYTE)&hall_of_fame, sizeof(struct score_t) * 3);
@@ -489,27 +492,27 @@ void write_hof(void)
 
 BOOL CALLBACK HOFDlgProc(HWND hWndDlg, UINT message, WPARAM wParam, LPARAM lParam) 
 { 
-	TCHAR Buffer[256];
-
     switch (message) 
     { 
 	case WM_INITDIALOG:
 		{
+			SetClassLong(hWndDlg, GCL_HICON, (LONG) LoadIcon(g_hInstance, MAKEINTRESOURCE(IDI_TETRIS)));
+
 			SetDlgItemText(hWndDlg, IDC_HOFNAME1, hall_of_fame[0].name);
 			SetDlgItemText(hWndDlg, IDC_HOFNAME2, hall_of_fame[1].name);
 			SetDlgItemText(hWndDlg, IDC_HOFNAME3, hall_of_fame[2].name);
 	
-			ZeroMemory(Buffer, 256);
-			sprintf(Buffer, "%d", hall_of_fame[0].score);
-			SetDlgItemText(hWndDlg, IDC_HOFSCORE1, Buffer);
+			ZeroMemory(szBuffer, STRING_BUFFER_SIZE);
+			_stprintf_s(szBuffer, STRING_BUFFER_SIZE, TEXT("%d"), hall_of_fame[0].score);
+			SetDlgItemText(hWndDlg, IDC_HOFSCORE1, szBuffer);
 
-			ZeroMemory(Buffer, 256);
-			sprintf(Buffer, "%d", hall_of_fame[1].score);
-			SetDlgItemText(hWndDlg, IDC_HOFSCORE2, Buffer);
+			ZeroMemory(szBuffer, STRING_BUFFER_SIZE);
+			_stprintf_s(szBuffer, STRING_BUFFER_SIZE, TEXT("%d"), hall_of_fame[1].score);
+			SetDlgItemText(hWndDlg, IDC_HOFSCORE2, szBuffer);
 
-			ZeroMemory(Buffer, 256);
-			sprintf(Buffer, "%d", hall_of_fame[2].score);
-			SetDlgItemText(hWndDlg, IDC_HOFSCORE3, Buffer);
+			ZeroMemory(szBuffer, STRING_BUFFER_SIZE);
+			_stprintf_s(szBuffer, STRING_BUFFER_SIZE, TEXT("%d"), hall_of_fame[2].score);
+			SetDlgItemText(hWndDlg, IDC_HOFSCORE3, szBuffer);
 			
 			return TRUE;
 		}
@@ -529,17 +532,22 @@ BOOL CALLBACK HOFDlgProc(HWND hWndDlg, UINT message, WPARAM wParam, LPARAM lPara
     return FALSE; 
 } 
 
-BOOL CALLBACK OkDlgProc(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam) 
+BOOL CALLBACK OkDlgProc(HWND hWndDlg, UINT message, WPARAM wParam, LPARAM lParam) 
 { 
     switch (message) 
-    { 
+    {
+		case WM_INITDIALOG:
+		{
+			SetClassLong(hWndDlg, GCL_HICON, (LONG) LoadIcon(g_hInstance, MAKEINTRESOURCE(IDI_TETRIS)));
+			return TRUE;
+		}
         case WM_COMMAND:
 			{
 				switch (LOWORD(wParam)) 
 				{ 
 					case IDOK:
 						{
-							EndDialog(hwndDlg, wParam); 
+							EndDialog(hWndDlg, wParam); 
 							return TRUE;
 						}
 				} 
@@ -549,17 +557,41 @@ BOOL CALLBACK OkDlgProc(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam
     return FALSE; 
 } 
 
-BOOL CALLBACK NameDlgProc(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam) 
-{ 
-	TCHAR Buffer[256];
+BOOL validate_name(PTCHAR szBuffer)
+{
+	BOOL result = FALSE;
 
+	if (!szBuffer) 
+		return result;
+
+	size_t idx = 0;
+	size_t len = _tcslen(szBuffer);
+		
+	while (idx < len)
+	{
+		if (!_istspace(szBuffer[idx]))
+		{
+			result = TRUE;
+			break;			
+		}
+
+		idx++;
+	}
+
+	return result;
+}
+
+BOOL CALLBACK NameDlgProc(HWND hWndDlg, UINT message, WPARAM wParam, LPARAM lParam) 
+{ 
     switch (message) 
     { 
 	case WM_INITDIALOG:
 		{
+			SetClassLong(hWndDlg, GCL_HICON, (LONG) LoadIcon(g_hInstance, MAKEINTRESOURCE(IDI_TETRIS)));
+
 			if (GetDlgCtrlID((HWND) wParam) != IDC_NAME) 
 			{ 
-				SetFocus(GetDlgItem(hwndDlg, IDC_NAME)); 
+				SetFocus(GetDlgItem(hWndDlg, IDC_NAME)); 
 				return FALSE; 
 			}
 			
@@ -571,30 +603,36 @@ BOOL CALLBACK NameDlgProc(HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lPar
 			{ 
 				case IDOK:
 					{
-						ZeroMemory(Buffer, 256);
-						GetDlgItemText(hwndDlg, IDC_NAME, Buffer, 7);
+						ZeroMemory(szBuffer, STRING_BUFFER_SIZE);
+						GetDlgItemText(hWndDlg, IDC_NAME, szBuffer, SCORE_MAX_NAME);
+
+						if (!validate_name(szBuffer))
+						{
+							MessageBox(NULL, TEXT("Please enter your name."), TEXT("Tetris"), MB_OK);
+							return FALSE;
+						}
 
 						if (score > hall_of_fame[0].score)
 						{
 							hall_of_fame[2] = hall_of_fame[1];
 							hall_of_fame[1] = hall_of_fame[0];
-							lstrcpy(hall_of_fame[0].name, Buffer);
+							_tcscpy_s(hall_of_fame[0].name, SCORE_MAX_NAME, szBuffer);
 							hall_of_fame[0].score = score;
 						}
 						else if (score > hall_of_fame[1].score)
 						{
 							hall_of_fame[2] = hall_of_fame[1];
-							lstrcpy(hall_of_fame[1].name, Buffer);
+							_tcscpy_s(hall_of_fame[1].name, SCORE_MAX_NAME, szBuffer);
 							hall_of_fame[1].score = score;
 						}
 						else if (score > hall_of_fame[2].score)
 						{
-							lstrcpy(hall_of_fame[2].name, Buffer);
+							_tcscpy_s(hall_of_fame[2].name, SCORE_MAX_NAME, szBuffer);
 							hall_of_fame[2].score = score;
 						}
 
 						write_hof();
-						EndDialog(hwndDlg, wParam); 
+						EndDialog(hWndDlg, wParam); 
 						return TRUE;
 					}
 			} 
@@ -614,7 +652,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_ACTIVATEAPP:
 		{
-			fActive = wParam;
+			fActive = (BOOL) wParam;
 			return 0L;
 		}
 	case WM_KEYDOWN:
@@ -641,6 +679,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 		}
 	case WM_CREATE:
 		{			
+			szBuffer = new TCHAR[STRING_BUFFER_SIZE];
+			if (!szBuffer)
+			{				
+				return -1;
+			}
+
 			read_hof();
 
 			timeGetDevCaps(&tc, sizeof(TIMECAPS));
@@ -685,7 +729,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 				
 				DrawEdge(hdcBackground, &r, EDGE_BUMP, BF_RECT);
 
-				hFont = CreateFont(-MulDiv(14, GetDeviceCaps(hdcBackground, LOGPIXELSY), 72), 0, 0, 0, 700, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_TT_ONLY_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, DEFAULT_PITCH, "Comic Sans MS");
+				hFont = CreateFont(-MulDiv(14, GetDeviceCaps(hdcBackground, LOGPIXELSY), 72), 0, 0, 0, 700, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_TT_ONLY_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, DEFAULT_PITCH, TEXT("Comic Sans MS"));
 				hPrevObject = SelectObject(hdcBackground, hFont);
 
 				SetBkMode(hdcBackground, TRANSPARENT);
@@ -703,10 +747,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 				DrawEdge(hdcBackground, &r, EDGE_BUMP, BF_RECT);
 
 				SIZE s;
-				TCHAR szText[] = "Next";
+				TCHAR szText[] = TEXT("Next");
 				
-				GetTextExtentPoint32(hdcBackground, szText, 4, &s);
-				TextOut(hdcBackground, (r.left + (r.right - r.left) / 2) - (s.cx / 2), r.top - s.cy, szText, 4);
+				GetTextExtentPoint32(hdcBackground, szText, ARRAYSIZE(szText) - 1, &s);
+				TextOut(hdcBackground, (r.left + (r.right - r.left) / 2) - (s.cx / 2), r.top - s.cy, szText, static_cast<int>(_tcslen(szText)));
 			}
 
 			// level
@@ -720,10 +764,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 				DrawEdge(hdcBackground, &r, EDGE_BUMP, BF_RECT);
 
 				SIZE s;
-				TCHAR szText[] = "Level";
+				TCHAR szText[] = TEXT("Level");
 				
-				GetTextExtentPoint32(hdcBackground, szText, 5, &s);
-				TextOut(hdcBackground, (r.left + (r.right - r.left) / 2) - (s.cx / 2), r.top - s.cy, szText, 5);
+				GetTextExtentPoint32(hdcBackground, szText, ARRAYSIZE(szText) - 1, &s);
+				TextOut(hdcBackground, (r.left + (r.right - r.left) / 2) - (s.cx / 2), r.top - s.cy, szText, static_cast<int>(_tcslen(szText)));
 			}
 			
 			// lines
@@ -737,10 +781,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 				DrawEdge(hdcBackground, &r, EDGE_BUMP, BF_RECT);
 
 				SIZE s;
-				TCHAR szText[] = "Lines";
+				TCHAR szText[] = TEXT("Lines");
 				
-				GetTextExtentPoint32(hdcBackground, szText, 5, &s);
-				TextOut(hdcBackground, (r.left + (r.right - r.left) / 2) - (s.cx / 2), r.top - s.cy, szText, 5);
+				GetTextExtentPoint32(hdcBackground, szText, ARRAYSIZE(szText) - 1, &s);
+				TextOut(hdcBackground, (r.left + (r.right - r.left) / 2) - (s.cx / 2), r.top - s.cy, szText, static_cast<int>(_tcslen(szText)));
 			}
 		
 			// score
@@ -754,37 +798,37 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 				DrawEdge(hdcBackground, &r, EDGE_BUMP, BF_RECT);
 
 				SIZE s;
-				TCHAR szText[] = "Score";
+				TCHAR szText[] = TEXT("Score");
 				
-				GetTextExtentPoint32(hdcBackground, szText, 5, &s);
-				TextOut(hdcBackground, (r.left + (r.right - r.left) / 2) - (s.cx / 2), r.top - s.cy, szText, 5);
+				GetTextExtentPoint32(hdcBackground, szText, ARRAYSIZE(szText) - 1, &s);
+				TextOut(hdcBackground, (r.left + (r.right - r.left) / 2) - (s.cx / 2), r.top - s.cy, szText, static_cast<int>(_tcslen(szText)));
 			}
 
 			DeleteObject(hFont);
 			SelectObject(hdcBackground, hPrevObject);
 
-			hFont = CreateFont(-MulDiv(8, GetDeviceCaps(hdcBackground, LOGPIXELSY), 72), 0, 0, 0, 700, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_TT_ONLY_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, DEFAULT_PITCH, "Comic Sans MS");
+			hFont = CreateFont(-MulDiv(8, GetDeviceCaps(hdcBackground, LOGPIXELSY), 72), 0, 0, 0, 700, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_TT_ONLY_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, DEFAULT_PITCH, TEXT("Comic Sans MS"));
 			hPrevObject = SelectObject(hdcBackground, hFont);
 
 			{
 				RECT r;
 				SetRect(&r, BRICK_WIDTH * (FIELD_WIDTH - 2), BRICK_HEIGHT * 20 + 4, BRICK_WIDTH * (FIELD_WIDTH + 5), BRICK_HEIGHT * (28));
 
-				TCHAR szText[] = "F1 - Help\nF2 - Hall of Fame\nF3 - About\nSpace - Start\nESC - Exit";
+				TCHAR szText[] = TEXT("F1 - Help\nF2 - Hall of Fame\nF3 - About\nSpace - Start\nESC - Exit");
 				SetTextColor(hdcBackground, RGB(0, 0, 255));
-				DrawText(hdcBackground, szText, 63, &r, DT_CENTER | DT_VCENTER | DT_WORDBREAK);
+				DrawText(hdcBackground, szText, ARRAYSIZE(szText) - 1, &r, DT_CENTER | DT_VCENTER | DT_WORDBREAK);
 			}
 
 			DeleteObject(hFont);
 			SelectObject(hdcBackground, hPrevObject);
 
-			hFont = CreateFont(-MulDiv(14, GetDeviceCaps(hdcBackground, LOGPIXELSY), 72), 0, 0, 0, 700, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_TT_ONLY_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, DEFAULT_PITCH, "Comic Sans MS");
+			hFont = CreateFont(-MulDiv(14, GetDeviceCaps(hdcBackground, LOGPIXELSY), 72), 0, 0, 0, 700, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_TT_ONLY_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, DEFAULT_PITCH, TEXT("Comic Sans MS"));
 			hPrevObject = SelectObject(hdcBuffer, hFont);
 
 			{
-				char Buffer[7] = "000000";
+				TCHAR szText[7] = TEXT("000000");
 				SIZE s;
-				GetTextExtentPoint32(hdcBuffer, Buffer, 6, &s);
+				GetTextExtentPoint32(hdcBuffer, szText, ARRAYSIZE(szText) - 1, &s);
 				text_offset_x = ((((BRICK_WIDTH * (FIELD_WIDTH + 4)) - (BRICK_WIDTH * (FIELD_WIDTH - 1))) - s.cx) / 2);
 				text_offset_y = (((BRICK_HEIGHT * 2) - s.cy) / 2);
 			}
@@ -797,7 +841,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 		}
 	case WM_CLOSE:
 		{
-			if (MessageBox(hWnd, "Exit?", "Tetris", MB_YESNO) == IDYES)
+			if (MessageBox(hWnd, TEXT("Exit?"), TEXT("Tetris"), MB_YESNO) == IDYES)
 				DestroyWindow(hWnd);
 			
 			return 0;
@@ -812,6 +856,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 		}
 	case WM_DESTROY:
 		{
+			delete szBuffer;
+
 			timeEndPeriod(tc.wPeriodMin);
 
 			for (int i = 0; i < COLOR_COUNT; i++)
@@ -841,6 +887,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	static TCHAR szAppName[] = TEXT("Tetris");
 	WNDCLASSEX wcex;
 
+	HANDLE hMutex = CreateMutex(NULL, TRUE, szClassName);	
+	if (ERROR_ALREADY_EXISTS == GetLastError())
+	{
+		MessageBox(NULL, TEXT("Tetris is already running."), szAppName, MB_OK);
+		CloseHandle(hMutex);
+		return 0;
+	}
+
 	g_hInstance = hInstance;
 
 	wcex.cbClsExtra = 0;
@@ -862,17 +916,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	DWORD dwStyle = WS_POPUP | WS_BORDER | WS_SYSMENU | WS_MINIMIZEBOX | WS_CAPTION;
 	DWORD dwExStyle = 0;
 
-	g_hWnd = CreateWindowEx(dwExStyle, szClassName, szAppName, dwStyle, 0, 0, 0, 0, NULL, NULL, hInstance, 0);
+	RECT r, w;
+	SetRect(&r, 0, 0, BRICK_WIDTH * (FIELD_WIDTH + INFO_WIDTH - 1), BRICK_HEIGHT * (FIELD_HEIGHT - 1));
+	AdjustWindowRectEx(&r, dwStyle, FALSE, dwExStyle);
+	SystemParametersInfo(SPI_GETWORKAREA, 0, &w, 0);
+	int width = r.right - r.left;
+	int height = r.bottom - r.top;
+	int x = ((w.right - w.left) / 2) - (width / 2);
+	int y = ((w.bottom - w.top) / 2) - (height / 2);
+
+	g_hWnd = CreateWindowEx(dwExStyle, szClassName, szAppName, dwStyle, x, y, width, height, NULL, NULL, hInstance, 0);
 	if (!g_hWnd)
 		return 0;
 
-	RECT r;
-	SetRect(&r, 0, 0, BRICK_WIDTH * (FIELD_WIDTH + INFO_WIDTH - 1), BRICK_HEIGHT * (FIELD_HEIGHT - 1));
-	AdjustWindowRectEx(&r, dwStyle, FALSE, dwExStyle);
-	MoveWindow(g_hWnd, (GetSystemMetrics(SM_CXFULLSCREEN) / 2) - ((r.right - r.left) / 2), 
-					(GetSystemMetrics(SM_CYFULLSCREEN) / 2) - ((r.bottom - r.top) / 2), 
-					r.right - r.left, r.bottom - r.top, FALSE);
-		
 	ShowWindow(g_hWnd, SW_NORMAL);
 	UpdateWindow(g_hWnd);
 
@@ -925,9 +981,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 							if (rows_per_level > 9)
 							{
 								rows_per_level = 0;
-								level++;
-								if (level > 19)
+								if (++level > 19)
+								{
 									level = 0;
+									for (int i = 0; i < 20; i++)
+									{
+										if ((speed[i] - 10) > 0)
+										{
+											speed[i] -= 10;
+										}
+										else
+										{
+											speed[i] = 0;
+										}
+									}
+								}
 							}
 
 							erase_piece(&next_piece);
@@ -964,5 +1032,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		render_frame(g_hWnd);
 	}
 
-	return msg.wParam;
+	ReleaseMutex(hMutex);
+	CloseHandle(hMutex);
+
+	return (int) msg.wParam;
 }
