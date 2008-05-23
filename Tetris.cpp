@@ -12,11 +12,13 @@
 
 #include <windows.h>
 #include <tchar.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <mmsystem.h>
 #include "resource.h"
 
+HDC g_hdc = NULL;
 HINSTANCE g_hInstance = NULL;
 HWND g_hWnd = NULL;
 
@@ -26,7 +28,7 @@ HDC hdcBuffer = NULL, hdcBackground = NULL;
 DWORD current_time = 0, last_time = 0;
 BOOL fDropped = FALSE, fStart = FALSE, fActive = FALSE;
 
-PTCHAR szBuffer;
+PTCHAR szBuffer = NULL, szLevel = NULL, szRows = NULL, szScore = NULL;
 const int STRING_BUFFER_SIZE = 256;
 
 const int COLOR_COUNT = 9;
@@ -324,27 +326,28 @@ void draw_field(HDC hdc)
 	}
 }
 
-void render_frame(HWND hWnd)
+void render_frame()
 {
 	BitBlt(hdcBuffer, 0, 0, BRICK_WIDTH * (FIELD_WIDTH + INFO_WIDTH - 1), BRICK_HEIGHT * (FIELD_HEIGHT - 1), hdcBackground, 0, 0, SRCCOPY);
 	
 	draw_field(hdcBuffer);
 	
-	ZeroMemory(szBuffer, sizeof(TCHAR) * STRING_BUFFER_SIZE);
-	_stprintf_s(szBuffer, STRING_BUFFER_SIZE, TEXT("%0.6d"), level + 1);
-	TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 9 + text_offset_y, szBuffer, static_cast<int>(_tcslen(szBuffer)));
+	if (NULL != szLevel)
+	{
+		TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 9 + text_offset_y, szLevel, static_cast<int>(_tcslen(szLevel)));
+	}
 
-	ZeroMemory(szBuffer, sizeof(TCHAR) * STRING_BUFFER_SIZE);
-	_stprintf_s(szBuffer, STRING_BUFFER_SIZE, TEXT("%0.6d"), total_rows);
-	TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 13 + text_offset_y, szBuffer, static_cast<int>(_tcslen(szBuffer)));
+	if (NULL != szRows)
+	{
+		TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 13 + text_offset_y, szRows, static_cast<int>(_tcslen(szRows)));
+	}
 
-	ZeroMemory(szBuffer, sizeof(TCHAR) * STRING_BUFFER_SIZE);
-	_stprintf_s(szBuffer, STRING_BUFFER_SIZE, TEXT("%0.6d"), score);
-	TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 17 + text_offset_y, szBuffer, static_cast<int>(_tcslen(szBuffer)));
+	if (NULL != szScore)
+	{
+		TextOut(hdcBuffer, BRICK_WIDTH * (FIELD_WIDTH - 1) + text_offset_x, BRICK_HEIGHT * 17 + text_offset_y, szScore, static_cast<int>(_tcslen(szScore)));
+	}
 
-	HDC hdc = GetDC(hWnd);
-	BitBlt(hdc, 0, 0, BRICK_WIDTH * (FIELD_WIDTH + INFO_WIDTH - 1), BRICK_HEIGHT * (FIELD_HEIGHT - 1), hdcBuffer, 0, 0, SRCCOPY);	
-	ReleaseDC(hWnd, hdc);
+	BitBlt(g_hdc, 0, 0, BRICK_WIDTH * (FIELD_WIDTH + INFO_WIDTH - 1), BRICK_HEIGHT * (FIELD_HEIGHT - 1), hdcBuffer, 0, 0, SRCCOPY);	
 }
 
 void process_input(void)
@@ -381,6 +384,24 @@ void process_input(void)
 
 		draw_piece(&active_piece);
 		draw_piece(&next_piece);
+
+		if (NULL != szLevel)
+		{
+			ZeroMemory(szLevel, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+			_stprintf_s(szLevel, STRING_BUFFER_SIZE, TEXT("%0.6d"), level + 1);
+		}
+
+		if (NULL != szScore)
+		{
+			ZeroMemory(szScore, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+			_stprintf_s(szScore, STRING_BUFFER_SIZE, TEXT("%0.6d"), score);
+		}
+
+		if (NULL != szRows)
+		{
+			ZeroMemory(szRows, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+			_stprintf_s(szRows, STRING_BUFFER_SIZE, TEXT("%0.6d"), total_rows);
+		}
 
 		LastKeyPressed = VK_SPACE;
 	}
@@ -496,7 +517,9 @@ BOOL CALLBACK HOFDlgProc(HWND hWndDlg, UINT message, WPARAM wParam, LPARAM lPara
     { 
 	case WM_INITDIALOG:
 		{
+#pragma warning( disable : 4311 ) // 'type cast' : pointer truncation from 'HICON' to 'LONG'
 			SetClassLong(hWndDlg, GCL_HICON, (LONG) LoadIcon(g_hInstance, MAKEINTRESOURCE(IDI_TETRIS)));
+#pragma warning( default : 4311 )
 
 			SetDlgItemText(hWndDlg, IDC_HOFNAME1, hall_of_fame[0].name);
 			SetDlgItemText(hWndDlg, IDC_HOFNAME2, hall_of_fame[1].name);
@@ -538,7 +561,9 @@ BOOL CALLBACK OkDlgProc(HWND hWndDlg, UINT message, WPARAM wParam, LPARAM lParam
     {
 		case WM_INITDIALOG:
 		{
+#pragma warning( disable : 4311 ) // 'type cast' : pointer truncation from 'HICON' to 'LONG'
 			SetClassLong(hWndDlg, GCL_HICON, (LONG) LoadIcon(g_hInstance, MAKEINTRESOURCE(IDI_TETRIS)));
+#pragma warning( default : 4311 )
 			return TRUE;
 		}
         case WM_COMMAND:
@@ -587,7 +612,9 @@ BOOL CALLBACK NameDlgProc(HWND hWndDlg, UINT message, WPARAM wParam, LPARAM lPar
     { 
 	case WM_INITDIALOG:
 		{
+#pragma warning( disable : 4311 ) // 'type cast' : pointer truncation from 'HICON' to 'LONG'
 			SetClassLong(hWndDlg, GCL_HICON, (LONG) LoadIcon(g_hInstance, MAKEINTRESOURCE(IDI_TETRIS)));
+#pragma warning( default : 4311 )
 
 			if (GetDlgCtrlID((HWND) wParam) != IDC_NAME) 
 			{ 
@@ -680,9 +707,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 	case WM_CREATE:
 		{			
 			szBuffer = new TCHAR[STRING_BUFFER_SIZE];
-			if (!szBuffer)
+			szLevel = new TCHAR[STRING_BUFFER_SIZE];
+			szRows = new TCHAR[STRING_BUFFER_SIZE];
+			szScore = new TCHAR[STRING_BUFFER_SIZE];
+
+			if (!szBuffer || !szLevel || !szRows || !szScore)
 			{				
 				return -1;
+			}
+
+			if (NULL != szLevel) 
+			{
+				ZeroMemory(szLevel, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+				_stprintf_s(szLevel, STRING_BUFFER_SIZE, TEXT("%0.6d"), 0);
+			}
+
+			if (NULL != szRows) 
+			{
+				ZeroMemory(szRows, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+				_stprintf_s(szRows, STRING_BUFFER_SIZE, TEXT("%0.6d"), 0);
+			}
+
+			if (NULL != szScore)
+			{
+				ZeroMemory(szScore, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+				_stprintf_s(szScore, STRING_BUFFER_SIZE, TEXT("%0.6d"), 0);
 			}
 
 			read_hof();
@@ -833,7 +882,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 				text_offset_y = (((BRICK_HEIGHT * 2) - s.cy) / 2);
 			}
 			
-
 			SetBkMode(hdcBuffer, TRANSPARENT);
 			SetTextColor(hdcBuffer, RGB(255, 255, 255));
 
@@ -850,13 +898,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 		{
 			PAINTSTRUCT ps;
 			BeginPaint(hWnd, &ps);
-			render_frame(hWnd);
+			render_frame();
 			EndPaint(hWnd, &ps);
 			return 0L;
 		}
 	case WM_DESTROY:
 		{
-			delete szBuffer;
+			delete szBuffer;			
+			delete szLevel;
+			delete szRows;
+			delete szScore;
+
+			szBuffer = NULL;
+			szLevel = NULL;
+			szRows = NULL;
+			szScore = NULL;
 
 			timeEndPeriod(tc.wPeriodMin);
 
@@ -908,7 +964,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	wcex.lpfnWndProc = WndProc;
 	wcex.lpszClassName = szClassName;
 	wcex.lpszMenuName = NULL;
-	wcex.style = 0;
+	wcex.style = CS_OWNDC;
 
 	if (!RegisterClassEx(&wcex))
 		return 0;
@@ -929,15 +985,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if (!g_hWnd)
 		return 0;
 
+	g_hdc = GetDC(g_hWnd);
+
 	ShowWindow(g_hWnd, SW_NORMAL);
 	UpdateWindow(g_hWnd);
 
-	MSG msg;
-	ZeroMemory(&msg, sizeof(MSG));
-	while (msg.message != WM_QUIT)
+	MSG msg;	
+	while (1)
 	{
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-		{			
+		{	
+			if (WM_QUIT == msg.message)
+				break;
+
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
@@ -975,7 +1035,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 							
 							score += ((full_rows * level) + rows_per_level);
 
+							if (NULL != szScore)
+							{
+								ZeroMemory(szScore, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+								_stprintf_s(szScore, STRING_BUFFER_SIZE, TEXT("%0.6d"), score);
+							}
+
 							total_rows += full_rows;
+
+							if (NULL != szRows)
+							{
+								ZeroMemory(szRows, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+								_stprintf_s(szRows, STRING_BUFFER_SIZE, TEXT("%0.6d"), total_rows);
+							}
 
 							rows_per_level += full_rows;					
 							if (rows_per_level > 9)
@@ -995,6 +1067,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 											speed[i] = 0;
 										}
 									}
+								}
+
+								if (NULL != szLevel)
+								{
+									ZeroMemory(szLevel, sizeof(TCHAR) * STRING_BUFFER_SIZE);
+									_stprintf_s(szLevel, STRING_BUFFER_SIZE, TEXT("%0.6d"), level + 1);
 								}
 							}
 
@@ -1029,7 +1107,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			}
 		}
 
-		render_frame(g_hWnd);
+		render_frame();
 	}
 
 	ReleaseMutex(hMutex);
